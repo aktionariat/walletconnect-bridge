@@ -5,6 +5,7 @@ import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
+import java.util.Iterator;
 
 import org.java_websocket.WebSocket;
 import org.java_websocket.handshake.ClientHandshake;
@@ -26,7 +27,7 @@ public class BridgeServer extends WebSocketServer {
 
 	@Override
 	public void onClose(WebSocket conn, int code, String reason, boolean remote) {
-		System.out.println(conn.getRemoteSocketAddress().getAddress() + " closed the connection.");
+		System.out.println(conn.getRemoteSocketAddress() + " closed the connection, status " + code);
 	}
 
 	@Override
@@ -70,15 +71,29 @@ public class BridgeServer extends WebSocketServer {
 	public void onError(WebSocket conn, Exception ex) {
 		ex.printStackTrace();
 		if (conn != null) {
-			// some errors like port binding failed may not be assignable to a specific websocket
+			conn.close(1011, ex.getMessage());
 		}
 	}
 
 	@Override
 	public void onStart() {
-		System.out.println("Server started!");
-		setConnectionLostTimeout(0);
-		setConnectionLostTimeout(100);
+		setConnectionLostTimeout(120);
+	}
+	
+	public synchronized void purgeInactiveConnections() {
+		long t0 = System.nanoTime();
+		System.out.println("Purging inactive connections...");
+		int count = 0;
+		Iterator<Bridge> bridges = this.bridges.values().iterator();
+		while (bridges.hasNext()) {
+			Bridge bridge = bridges.next();
+			if (bridge.isInactive()) {
+				bridge.dispose();
+				bridges.remove();
+				count++;
+			}
+		}
+		System.out.println("... purge of " + count + " completed in " + (System.nanoTime() - t0)/1000/1000 + "ms.");
 	}
 
 	public static void main(String[] args) throws InterruptedException, IOException {
@@ -88,7 +103,8 @@ public class BridgeServer extends WebSocketServer {
 
 		try {
 			while (true) {
-				Thread.sleep(1000);
+				Thread.sleep(120*1000);
+				s.purgeInactiveConnections();
 			}
 		} finally {
 			s.stop(500);
