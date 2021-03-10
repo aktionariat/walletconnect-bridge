@@ -1,0 +1,11 @@
+/target/
+/test/
+*.log
+*.tmp
+nohup.out
+nohup.old
+/.apt_generated/
+
+# For IntelliJ
+.idea
+*.iml
