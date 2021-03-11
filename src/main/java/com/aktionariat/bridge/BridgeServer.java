@@ -4,10 +4,12 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 
 import org.java_websocket.WebSocket;
+import org.java_websocket.framing.Framedata;
 import org.java_websocket.handshake.ClientHandshake;
 import org.java_websocket.server.WebSocketServer;
 
@@ -28,6 +30,15 @@ public class BridgeServer extends WebSocketServer {
 	@Override
 	public void onClose(WebSocket conn, int code, String reason, boolean remote) {
 		System.out.println(conn.getRemoteSocketAddress() + " closed the connection, status " + code);
+	}
+	
+	@Override
+	public void onWebsocketPong( WebSocket conn, Framedata f ) {
+		super.onWebsocketPong(conn, f);
+		Bridge bridge = (Bridge)conn.getAttachment();
+		if (bridge != null) {
+			bridge.ack();
+		}
 	}
 
 	@Override
@@ -95,9 +106,18 @@ public class BridgeServer extends WebSocketServer {
 		}
 		System.out.println("... purge of " + count + " completed in " + (System.nanoTime() - t0)/1000/1000 + "ms.");
 	}
+	
+	private static int findPort(String[] args) {
+		int i = Arrays.asList(args).indexOf("-p");
+		if (i >= 0) {
+			return Integer.parseInt(args[i+1]);
+		} else {
+			return 8887;
+		}
+	}
 
 	public static void main(String[] args) throws InterruptedException, IOException {
-		BridgeServer s = new BridgeServer(8887);
+		BridgeServer s = new BridgeServer(findPort(args));
 		s.start();
 		System.out.println("WalletConnect bridge started on port: " + s.getPort());
 

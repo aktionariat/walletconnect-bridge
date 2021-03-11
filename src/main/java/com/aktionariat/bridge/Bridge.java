@@ -31,6 +31,7 @@ public class Bridge {
 		if (this.subscriber != null) {
 			try {
 				this.subscriber.send(msg);
+				this.subscriber.sendPing();
 			} catch (WebsocketNotConnectedException e) {
 				this.subscriber = null;
 			}
@@ -44,9 +45,11 @@ public class Bridge {
 		}
 		this.touch();
 		this.subscriber = conn;
+		this.subscriber.setAttachment(this);
 		for (String msg : messages) {
 			subscriber.send(msg);
 		}
+		this.subscriber.sendPing();
 	}
 
 	public synchronized void ack() {
