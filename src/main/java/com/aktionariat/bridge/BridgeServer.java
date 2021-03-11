@@ -107,7 +107,8 @@ public class BridgeServer extends WebSocketServer {
 				s.purgeInactiveConnections();
 			}
 		} finally {
-			s.stop(500);
+			System.out.println("Stopping server.");
+			s.stop();
 		}
 	}
 
