@@ -1,3 +1,11 @@
+/**
+ * Created by Luzius Meisser on 2021-03-10
+ * Copyright: Aktionariat AG, Zurich
+ * Contact: luzius@aktionariat.com
+ *
+ * Feel free to reuse this code under the MIT License
+ * https://opensource.org/licenses/MIT
+ */
 package com.aktionariat.bridge;
 
 import java.io.IOException;

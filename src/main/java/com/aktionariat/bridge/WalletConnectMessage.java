@@ -1,7 +1,7 @@
 /**
- * Created by Luzius Meisser on Jun 13, 2017
- * Copyright: Meisser Economics AG, Zurich
- * Contact: luzius@meissereconomics.com
+ * Created by Luzius Meisser on 2021-03-10
+ * Copyright: Aktionariat AG, Zurich
+ * Contact: luzius@aktionariat.com
  *
  * Feel free to reuse this code under the MIT License
  * https://opensource.org/licenses/MIT
