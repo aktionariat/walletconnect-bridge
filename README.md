@@ -30,3 +30,7 @@ There are a number of differences to the reference implementation, which I'd lik
 
 For the future, we are contemplating the addition of sequence numbers in order to eliminate the unlikely possibility of a delayed ack leading to the deletion of an undelivered message.
 
+## Aktionariat Instance
+
+We are running an instance of this server at address 'ws://bridge.aktionariat.com:8887'. Feel free to use it, but do not rely on its availability.
+
