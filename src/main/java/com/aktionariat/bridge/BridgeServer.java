@@ -8,24 +8,38 @@
  */
 package com.aktionariat.bridge;
 
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.BindException;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
+import java.security.KeyManagementException;
+import java.security.KeyStore;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
+import java.security.UnrecoverableKeyException;
+import java.security.cert.CertificateException;
 import java.util.HashMap;
 import java.util.Iterator;
 
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManagerFactory;
+
 import org.java_websocket.WebSocket;
+import org.java_websocket.WebSocketServerFactory;
 import org.java_websocket.framing.Framedata;
 import org.java_websocket.handshake.ClientHandshake;
+import org.java_websocket.server.DefaultSSLWebSocketServerFactory;
+import org.java_websocket.server.DefaultWebSocketServerFactory;
 import org.java_websocket.server.WebSocketServer;
 
 public class BridgeServer extends WebSocketServer {
 
 	private static final String NAME = "WalletConnect Bridge Java Edition 0.1";
-	
+
 	private HashMap<String, Bridge> bridges;
 	private boolean startAttemptCompleted;
 	private BindException error;
@@ -139,19 +153,11 @@ public class BridgeServer extends WebSocketServer {
 		System.out.println("... purge of " + count + " completed in " + (System.nanoTime() - t0) / 1000 / 1000 + "ms.");
 	}
 
-	private static int findPort(String[] args) {
-		int i = Arrays.asList(args).indexOf("-p");
-		if (i >= 0) {
-			return Integer.parseInt(args[i + 1]);
-		} else {
-			return 8887;
-		}
-	}
-	
-	public static BridgeServer startWithRetries(int port) throws UnknownHostException, InterruptedException {
+	public static BridgeServer startWithRetries(WebSocketServerFactory socketFactory, int port) throws UnknownHostException, InterruptedException {
 		while (true) {
 			try {
 				BridgeServer server = new BridgeServer(port);
+				server.setWebSocketFactory(socketFactory);
 				server.start();
 				server.waitForStart();
 				return server;
@@ -162,8 +168,27 @@ public class BridgeServer extends WebSocketServer {
 		}
 	}
 
-	public static void main(String[] args) throws InterruptedException, IOException {
-		BridgeServer s = startWithRetries(findPort(args));
+	public static void main(String[] argStrings) throws InterruptedException, IOException, NoSuchAlgorithmException, CertificateException, KeyStoreException, UnrecoverableKeyException, KeyManagementException {
+		Arguments args = new Arguments(argStrings);
+		WebSocketServerFactory socketFactory = new DefaultWebSocketServerFactory();
+		if (args.hasArgument("-cert")) {
+			String keystoreFile = args.get("-cert");
+			assert new File(keystoreFile).exists();
+			char[] passphrase = args.get("-passphrase").toCharArray();
+			KeyStore keystore = KeyStore.getInstance(KeyStore.getDefaultType());
+			try (FileInputStream fis = new FileInputStream(new File(keystoreFile))) {
+				keystore.load(fis, passphrase);
+				KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+				keyManagerFactory.init(keystore, passphrase);
+				TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+				trustManagerFactory.init(keystore);
+				SSLContext ctx = SSLContext.getInstance("TLS");
+				ctx.init(keyManagerFactory.getKeyManagers(), trustManagerFactory.getTrustManagers(), null);
+				socketFactory = new DefaultSSLWebSocketServerFactory(ctx);
+			}
+		}
+		int port = args.get("-port", 8887);
+		BridgeServer s = startWithRetries(socketFactory, port);
 		System.out.println(NAME + " started on port: " + s.getPort());
 
 		try {
