@@ -16,6 +16,8 @@ import org.java_websocket.server.WebSocketServer;
 
 public class BridgeServer extends WebSocketServer {
 
+	private static final String NAME = "WalletConnect Bridge Java Edition 0.1";
+	
 	private HashMap<String, Bridge> bridges;
 	private boolean startAttemptCompleted;
 	private BindException error;
@@ -154,7 +156,7 @@ public class BridgeServer extends WebSocketServer {
 
 	public static void main(String[] args) throws InterruptedException, IOException {
 		BridgeServer s = startWithRetries(findPort(args));
-		System.out.println("WalletConnect bridge started on port: " + s.getPort());
+		System.out.println(NAME + " started on port: " + s.getPort());
 
 		try {
 			while (true) {
