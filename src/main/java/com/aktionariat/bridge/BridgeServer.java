@@ -1,6 +1,7 @@
 package com.aktionariat.bridge;
 
 import java.io.IOException;
+import java.net.BindException;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
@@ -16,9 +17,12 @@ import org.java_websocket.server.WebSocketServer;
 public class BridgeServer extends WebSocketServer {
 
 	private HashMap<String, Bridge> bridges;
+	private boolean startAttemptCompleted;
+	private BindException error;
 
 	public BridgeServer(int port) throws UnknownHostException {
 		super(new InetSocketAddress(port));
+		this.startAttemptCompleted = false;
 		this.bridges = new HashMap<String, Bridge>();
 	}
 
@@ -80,15 +84,33 @@ public class BridgeServer extends WebSocketServer {
 
 	@Override
 	public void onError(WebSocket conn, Exception ex) {
-		ex.printStackTrace();
-		if (conn != null) {
-			conn.close(1011, ex.getMessage());
+		if (ex instanceof BindException) {
+			synchronized (this) {
+				this.startAttemptCompleted = true;
+				this.error = (BindException) ex;
+				this.notifyAll();
+			}
+		} else {
+			ex.printStackTrace();
+			if (conn != null) {
+				conn.close(1011, ex.getMessage());
+			}
 		}
 	}
 
 	@Override
-	public void onStart() {
-		setConnectionLostTimeout(120);
+	public synchronized void onStart() {
+		this.startAttemptCompleted = true;
+		this.notifyAll();
+	}
+
+	public synchronized void waitForStart() throws BindException, InterruptedException {
+		while (!startAttemptCompleted) {
+			this.wait();
+		}
+		if (this.error != null) {
+			throw error;
+		}
 	}
 
 	public synchronized void purgeInactiveConnections() {
@@ -115,24 +137,32 @@ public class BridgeServer extends WebSocketServer {
 			return 8887;
 		}
 	}
+	
+	public static BridgeServer startWithRetries(int port) throws UnknownHostException, InterruptedException {
+		while (true) {
+			try {
+				BridgeServer server = new BridgeServer(port);
+				server.start();
+				server.waitForStart();
+				return server;
+			} catch (BindException e) {
+				System.out.println("Port already in use, trying again in three seconds.");
+				Thread.sleep(3000);
+			}
+		}
+	}
 
 	public static void main(String[] args) throws InterruptedException, IOException {
-		BridgeServer s = new BridgeServer(findPort(args));
-		s.start();
+		BridgeServer s = startWithRetries(findPort(args));
 		System.out.println("WalletConnect bridge started on port: " + s.getPort());
 
-		Runtime.getRuntime().addShutdownHook(new Thread() {
-			public void run() {
-				try {
-					System.out.println("Stopping server.");
-					s.stop();
-				} catch (IOException | InterruptedException e) {
-				}
+		try {
+			while (true) {
+				Thread.sleep(120 * 1000);
+				s.purgeInactiveConnections();
 			}
-		});
-		while (true) {
-			Thread.sleep(120 * 1000);
-			s.purgeInactiveConnections();
+		} finally {
+			s.stop(); // does not seem to work
 		}
 	}
 
