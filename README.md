@@ -4,7 +4,7 @@ This is a simple Java implementation of a WalletConnect bridge server. If you do
 
 ## Motivation
 
-I've created this bridge server as the [official server](bridge.walletconnect.org) does not seem very reliable. Messages are often only dispatched with a considerable delay and sometimes disappear entirely. While part of that can probably be attributed to a high load, part of that is probably also attributable to some flaws in the implementation. So I decided to create our own implementation in the language I'm most fluent in.
+I've created this bridge server as the official server (ws://bridge.walletconnect.org) does not seem consistently reliable. Messages are often only dispatched with a considerable delay and sometimes disappear entirely. While part of that can probably be attributed to a high load, part of that is probably also attributable to some flaws in the implementation. So I decided to create our own implementation in the language I'm most fluent in.
 
 ## Running the Brigde
 
@@ -27,6 +27,7 @@ There are a number of differences to the reference implementation, which I'd lik
 * After sending one or more 'put' messages to a subscriber, we add a 'ping' message. The message queue is only cleared once the subscriber answers with the according 'pong' message. This ensures that messages are actually received and not sent to stale connections.
 * The reference implementation keeps undelivered messages indefinitely in a redis in-memory database, we drop them after 30 minutes. We do this to keep the memory footprint small. This is ok under the assumption that the use case at hand is about immediaty interaction between a website and a wallet, and not for slow, email-like interactions.
 * We do not support the push server, ignoring the "silent" flag.
+* No support for the 'hello', 'status' and similar methods. But the websocket standard 'ping' is there.
 
 For the future, we are contemplating the addition of sequence numbers in order to eliminate the unlikely possibility of a delayed ack leading to the deletion of an undelivered message.
 
