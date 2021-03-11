@@ -31,11 +31,11 @@ public class BridgeServer extends WebSocketServer {
 	public void onClose(WebSocket conn, int code, String reason, boolean remote) {
 		System.out.println(conn.getRemoteSocketAddress() + " closed the connection, status " + code);
 	}
-	
+
 	@Override
-	public void onWebsocketPong( WebSocket conn, Framedata f ) {
+	public void onWebsocketPong(WebSocket conn, Framedata f) {
 		super.onWebsocketPong(conn, f);
-		Bridge bridge = (Bridge)conn.getAttachment();
+		Bridge bridge = (Bridge) conn.getAttachment();
 		if (bridge != null) {
 			bridge.ack();
 		}
@@ -90,7 +90,7 @@ public class BridgeServer extends WebSocketServer {
 	public void onStart() {
 		setConnectionLostTimeout(120);
 	}
-	
+
 	public synchronized void purgeInactiveConnections() {
 		long t0 = System.nanoTime();
 		System.out.println("Purging inactive connections...");
@@ -104,13 +104,13 @@ public class BridgeServer extends WebSocketServer {
 				count++;
 			}
 		}
-		System.out.println("... purge of " + count + " completed in " + (System.nanoTime() - t0)/1000/1000 + "ms.");
+		System.out.println("... purge of " + count + " completed in " + (System.nanoTime() - t0) / 1000 / 1000 + "ms.");
 	}
-	
+
 	private static int findPort(String[] args) {
 		int i = Arrays.asList(args).indexOf("-p");
 		if (i >= 0) {
-			return Integer.parseInt(args[i+1]);
+			return Integer.parseInt(args[i + 1]);
 		} else {
 			return 8887;
 		}
@@ -121,14 +121,18 @@ public class BridgeServer extends WebSocketServer {
 		s.start();
 		System.out.println("WalletConnect bridge started on port: " + s.getPort());
 
-		try {
-			while (true) {
-				Thread.sleep(120*1000);
-				s.purgeInactiveConnections();
+		Runtime.getRuntime().addShutdownHook(new Thread() {
+			public void run() {
+				try {
+					System.out.println("Stopping server.");
+					s.stop();
+				} catch (IOException | InterruptedException e) {
+				}
 			}
-		} finally {
-			System.out.println("Stopping server.");
-			s.stop();
+		});
+		while (true) {
+			Thread.sleep(120 * 1000);
+			s.purgeInactiveConnections();
 		}
 	}
 
