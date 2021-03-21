@@ -4,7 +4,7 @@ This is a simple Java implementation of a WalletConnect bridge server. If you do
 
 ## Motivation
 
-I've created this bridge server as the official server (ws://bridge.walletconnect.org) does not seem consistently reliable. Messages are often only dispatched with a considerable delay and sometimes disappear entirely. While part of that can probably be attributed to a high load, part of that is probably also attributable to some flaws in the implementation. So I decided to create our own implementation in the language I'm most fluent in.
+My motiviation for writing this implementation is that the official server (wss://bridge.walletconnect.org) does not seem consistently reliable. Messages are often only dispatched with a considerable delay and sometimes disappear entirely. While part of that can probably be attributed to a high load, part of that is probably also attributable to some flaws in the implementation. So I decided to create our own implementation in the language I'm most fluent in.
 
 ## Running the Bridge
 
@@ -13,6 +13,14 @@ To run the bridge, clone this git repository to your server and make sure to hav
 You can then compile the project with 'mvn package' and run it with 'java -cp target/bridge.jar:target/dependency/* com.aktionariat.bridge.BridgeServer'. (Windows users should replace the colon ':' with a semicolon ';' as Windows has a different path separator.)
 
 This spawns a local bridge server on port 8887.
+
+Arguments:
+
+- -port: the port number, defaults to 8887
+- -cert: path to the keystore file, enables wss
+- -passphrase: the passphrase for the keystore file
+
+(Since certificate handling is not so convenient in Java, it is probably easier to run [Caddyserver](http://caddyserver.com/) or similar in front of the bridge instead of configuring ssl on the bridge server directly.)
 
 ## Protocol
 

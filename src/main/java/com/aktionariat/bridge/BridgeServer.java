@@ -88,7 +88,7 @@ public class BridgeServer extends WebSocketServer {
 			}
 		} catch (IOException e) {
 			System.out.println("Error: " + e);
-			conn.close(200, "Error: " + e.getMessage());
+			conn.close();
 		}
 	}
 
@@ -103,7 +103,9 @@ public class BridgeServer extends WebSocketServer {
 
 	@Override
 	public void onMessage(WebSocket conn, ByteBuffer message) {
-		onMessage(conn, new String(message.array()));
+		int pos = message.arrayOffset() + message.position();
+		int len = message.remaining();
+		onMessage(conn, new String(message.array(), pos, len));
 	}
 
 	@Override
