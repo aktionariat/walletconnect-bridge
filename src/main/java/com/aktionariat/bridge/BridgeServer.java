@@ -73,18 +73,22 @@ public class BridgeServer extends WebSocketServer {
 	public void onMessage(WebSocket conn, String message) {
 		try {
 			System.out.println("Received " + message + " from " + conn.getRemoteSocketAddress().getAddress());
-			WalletConnectMessage msg = WalletConnectMessage.parse(message);
-			Bridge bridge = obtainBridge(msg.topic);
-			switch (msg.type) {
-			case "pub":
-				bridge.push(message);
-				break;
-			case "sub":
-				bridge.sub(conn);
-				break;
-			case "ack":
-				bridge.ack();
-				break;
+			if (message.contentEquals("ping")) {
+				conn.send("pong"); // custom ping pong for monitoring, not related to ws protocol level ping
+			} else {
+				WalletConnectMessage msg = WalletConnectMessage.parse(message);
+				Bridge bridge = obtainBridge(msg.topic);
+				switch (msg.type) {
+				case "pub":
+					bridge.push(message);
+					break;
+				case "sub":
+					bridge.sub(conn);
+					break;
+				case "ack":
+					bridge.ack();
+					break;
+				}
 			}
 		} catch (IOException e) {
 			System.out.println("Error: " + e);
@@ -170,7 +174,8 @@ public class BridgeServer extends WebSocketServer {
 		}
 	}
 
-	public static void main(String[] argStrings) throws InterruptedException, IOException, NoSuchAlgorithmException, CertificateException, KeyStoreException, UnrecoverableKeyException, KeyManagementException {
+	public static void main(String[] argStrings)
+			throws InterruptedException, IOException, NoSuchAlgorithmException, CertificateException, KeyStoreException, UnrecoverableKeyException, KeyManagementException {
 		Arguments args = new Arguments(argStrings);
 		WebSocketServerFactory socketFactory = new DefaultWebSocketServerFactory();
 		if (args.hasArgument("-cert")) {
