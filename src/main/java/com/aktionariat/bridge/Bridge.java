@@ -49,7 +49,7 @@ public class Bridge {
 	public synchronized WebSocket sub(WebSocket conn) {
 		WebSocket replaced = this.subscriber;
 		if (replaced != null && replaced != conn) {
-			System.out.println("Replacing subscriber " + this.subscriber + " with  " + conn);
+			System.out.println("Replacing subscriber " + this.subscriber + " with  " + conn.getRemoteSocketAddress());
 			replaced.close(1000, "Replaced by new subscriber");
 		}
 		this.touch();
