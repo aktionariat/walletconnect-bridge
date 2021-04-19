@@ -31,7 +31,6 @@ import javax.net.ssl.TrustManagerFactory;
 
 import org.java_websocket.WebSocket;
 import org.java_websocket.WebSocketServerFactory;
-import org.java_websocket.framing.CloseFrame;
 import org.java_websocket.framing.Framedata;
 import org.java_websocket.handshake.ClientHandshake;
 import org.java_websocket.server.DefaultSSLWebSocketServerFactory;
@@ -50,6 +49,7 @@ public class BridgeServer extends WebSocketServer {
 
 	public BridgeServer(int port) throws UnknownHostException {
 		super(new InetSocketAddress(port));
+		super.setReuseAddr(true);
 		this.startAttemptCompleted = false;
 		this.bridges = new HashMap<String, Bridge>();
 		this.subscriptions = new HashMap<WebSocket, HashSet<Bridge>>();
@@ -203,27 +203,13 @@ public class BridgeServer extends WebSocketServer {
 		}
 		System.out.println("... purge of " + count + " completed in " + (System.nanoTime() - t0) / 1000 / 1000 + "ms.");
 	}
-	
-	public synchronized void closeAll() {
-		for (WebSocket conn: getConnections()) {
-			System.out.println("Closing " + conn.getRemoteSocketAddress());
-			conn.close(CloseFrame.GOING_AWAY);
-		}
-	}
 
-	public static BridgeServer startWithRetries(WebSocketServerFactory socketFactory, int port) throws UnknownHostException, InterruptedException {
-		while (true) {
-			try {
-				BridgeServer server = new BridgeServer(port);
-				server.setWebSocketFactory(socketFactory);
-				server.start();
-				server.waitForStart();
-				return server;
-			} catch (BindException e) {
-				System.out.println("Port already in use, trying again in three seconds.");
-				Thread.sleep(3000);
-			}
-		}
+	public static BridgeServer start(WebSocketServerFactory socketFactory, int port) throws UnknownHostException, InterruptedException, BindException {
+		BridgeServer server = new BridgeServer(port);
+		server.setWebSocketFactory(socketFactory);
+		server.start();
+		server.waitForStart();
+		return server;
 	}
 
 	public static void main(String[] argStrings)
@@ -247,23 +233,16 @@ public class BridgeServer extends WebSocketServer {
 			}
 		}
 		int port = args.get("-port", 8887);
-		BridgeServer s = startWithRetries(socketFactory, port);
+		BridgeServer s = start(socketFactory, port);
 		System.out.println(NAME + " started on port: " + s.getPort());
 
-		Runtime.getRuntime().addShutdownHook(new Thread() {
-			@Override
-			public void run() {
-				System.out.println("Running shutdown hook");
-				s.closeAll();
-			}
-		});
 		try {
 			while (true) {
 				Thread.sleep(120 * 1000);
 				s.purgeInactiveConnections();
 			}
 		} finally {
-			s.stop(); // does not seem to work
+			s.stop();
 		}
 	}
 
