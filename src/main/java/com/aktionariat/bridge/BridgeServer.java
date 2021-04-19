@@ -31,6 +31,7 @@ import javax.net.ssl.TrustManagerFactory;
 
 import org.java_websocket.WebSocket;
 import org.java_websocket.WebSocketServerFactory;
+import org.java_websocket.framing.CloseFrame;
 import org.java_websocket.framing.Framedata;
 import org.java_websocket.handshake.ClientHandshake;
 import org.java_websocket.server.DefaultSSLWebSocketServerFactory;
@@ -132,7 +133,7 @@ public class BridgeServer extends WebSocketServer {
 		HashSet<Bridge> subscriptions = this.subscriptions.get(conn);
 		if (subscriptions != null) {
 			for (Bridge bridge : subscriptions) {
-				System.out.println("Implicitely acking " + bridge + " from " + conn);
+				System.out.println("Implicitely acking " + bridge + " from " + conn.getRemoteSocketAddress());
 				bridge.ack();
 			}
 		}
@@ -202,6 +203,13 @@ public class BridgeServer extends WebSocketServer {
 		}
 		System.out.println("... purge of " + count + " completed in " + (System.nanoTime() - t0) / 1000 / 1000 + "ms.");
 	}
+	
+	public synchronized void closeAll() {
+		for (WebSocket conn: getConnections()) {
+			System.out.println("Closing " + conn.getRemoteSocketAddress());
+			conn.close(CloseFrame.GOING_AWAY);
+		}
+	}
 
 	public static BridgeServer startWithRetries(WebSocketServerFactory socketFactory, int port) throws UnknownHostException, InterruptedException {
 		while (true) {
@@ -242,6 +250,13 @@ public class BridgeServer extends WebSocketServer {
 		BridgeServer s = startWithRetries(socketFactory, port);
 		System.out.println(NAME + " started on port: " + s.getPort());
 
+		Runtime.getRuntime().addShutdownHook(new Thread() {
+			@Override
+			public void run() {
+				System.out.println("Running shutdown hook");
+				s.closeAll();
+			}
+		});
 		try {
 			while (true) {
 				Thread.sleep(120 * 1000);
