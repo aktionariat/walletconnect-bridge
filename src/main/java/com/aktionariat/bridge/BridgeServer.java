@@ -130,7 +130,7 @@ public class BridgeServer extends WebSocketServer {
 
 	private synchronized void implicitAck(WebSocket conn) {
 		HashSet<Bridge> subscriptions = this.subscriptions.get(conn);
-		if (conn != null) {
+		if (subscriptions != null) {
 			for (Bridge bridge : subscriptions) {
 				System.out.println("Implicitely acking " + bridge + " from " + conn);
 				bridge.ack();
