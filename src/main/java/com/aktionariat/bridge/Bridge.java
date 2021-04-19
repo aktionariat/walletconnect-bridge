@@ -46,10 +46,11 @@ public class Bridge {
 		}
 	}
 
-	public synchronized void sub(WebSocket conn) {
-		if (this.subscriber != null && this.subscriber != conn) {
+	public synchronized WebSocket sub(WebSocket conn) {
+		WebSocket replaced = this.subscriber;
+		if (replaced != null && replaced != conn) {
 			System.out.println("Replacing subscriber " + this.subscriber + " with  " + conn);
-			this.subscriber.close(1000, "Replaced by new subscriber");
+			replaced.close(1000, "Replaced by new subscriber");
 		}
 		this.touch();
 		this.subscriber = conn;
@@ -58,6 +59,7 @@ public class Bridge {
 			subscriber.send(msg);
 		}
 		this.subscriber.sendPing();
+		return replaced;
 	}
 
 	public synchronized void ack() {
@@ -71,11 +73,13 @@ public class Bridge {
 		return System.nanoTime() - this.lastActivity > ACTIVE_PERIOD;
 	}
 
-	public void dispose() {
-		if (this.subscriber != null) {
-			this.subscriber.close();
+	public WebSocket dispose() {
+		WebSocket disposed = this.subscriber;
+		if (disposed != null) {
+			disposed.close();
 			this.subscriber = null;
 		}
+		return disposed;
 	}
 
 	@Override
