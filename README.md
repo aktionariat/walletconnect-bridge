@@ -41,5 +41,5 @@ For the future, we are contemplating the addition of sequence numbers in order t
 
 ## Aktionariat Instance
 
-We are running an instance of this server at address 'ws://bridge.aktionariat.com:8887'. Feel free to use it, but do not rely on its availability. The instance is also reachable via a secure connection on 'wss://api.aktionariat.com:8887'.
+We are running an instance of this server at address 'wss://bridge.aktionariat.com:8887'. Feel free to use it, but do not rely on its availability.
 

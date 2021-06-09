@@ -22,6 +22,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.UnrecoverableKeyException;
 import java.security.cert.CertificateException;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 
 import javax.net.ssl.KeyManagerFactory;
@@ -41,13 +42,17 @@ public class BridgeServer extends WebSocketServer {
 	private static final String NAME = "WalletConnect Bridge Java Edition 0.1";
 
 	private HashMap<String, Bridge> bridges;
+	private HashMap<WebSocket, HashSet<Bridge>> subscriptions;
+
 	private boolean startAttemptCompleted;
 	private BindException error;
 
 	public BridgeServer(int port) throws UnknownHostException {
 		super(new InetSocketAddress(port));
+		super.setReuseAddr(true);
 		this.startAttemptCompleted = false;
 		this.bridges = new HashMap<String, Bridge>();
+		this.subscriptions = new HashMap<WebSocket, HashSet<Bridge>>();
 	}
 
 	@Override
@@ -76,6 +81,7 @@ public class BridgeServer extends WebSocketServer {
 			if (message.contentEquals("ping")) {
 				conn.send("pong"); // custom ping pong for monitoring, not related to ws protocol level ping
 			} else {
+				implicitAck(conn);
 				WalletConnectMessage msg = WalletConnectMessage.parse(message);
 				Bridge bridge = obtainBridge(msg.topic);
 				switch (msg.type) {
@@ -83,7 +89,8 @@ public class BridgeServer extends WebSocketServer {
 					bridge.push(message);
 					break;
 				case "sub":
-					bridge.sub(conn);
+					WebSocket replaced = bridge.sub(conn);
+					updateSubscription(replaced, conn, bridge);
 					break;
 				case "ack":
 					bridge.ack();
@@ -94,6 +101,43 @@ public class BridgeServer extends WebSocketServer {
 			System.out.println("Error: " + e);
 			conn.close();
 		}
+	}
+
+	private synchronized void updateSubscription(WebSocket replaced, WebSocket conn, Bridge bridge) {
+		if (replaced != conn) {
+			removeSubscription(replaced, bridge);
+			addSubscription(conn, bridge);
+		}
+	}
+
+	private synchronized void removeSubscription(WebSocket replaced, Bridge bridge) {
+		if (replaced != null) {
+			HashSet<Bridge> bridges = this.subscriptions.get(replaced);
+			bridges.remove(bridge);
+			if (bridges.isEmpty()) {
+				this.subscriptions.remove(replaced);
+			}
+		}
+	}
+
+	private synchronized void addSubscription(WebSocket conn, Bridge bridge) {
+		HashSet<Bridge> bridges = this.subscriptions.get(conn);
+		if (bridges == null) {
+			bridges = new HashSet<Bridge>();
+			this.subscriptions.put(conn, bridges);
+		}
+		bridges.add(bridge);
+	}
+
+	private synchronized void implicitAck(WebSocket conn) {
+		HashSet<Bridge> subscriptions = this.subscriptions.get(conn);
+		if (subscriptions != null) {
+			for (Bridge bridge : subscriptions) {
+				System.out.println("Implicitely acking " + bridge + " from " + conn.getRemoteSocketAddress());
+				bridge.ack();
+			}
+		}
+
 	}
 
 	private synchronized Bridge obtainBridge(String topic) {
@@ -145,13 +189,14 @@ public class BridgeServer extends WebSocketServer {
 
 	public synchronized void purgeInactiveConnections() {
 		long t0 = System.nanoTime();
+		System.out.println("Currently, there are " + this.subscriptions.size() + " subscriptions and " + this.bridges.size() + " bridges.");
 		System.out.println("Purging inactive connections...");
 		int count = 0;
 		Iterator<Bridge> bridges = this.bridges.values().iterator();
 		while (bridges.hasNext()) {
 			Bridge bridge = bridges.next();
 			if (bridge.isInactive()) {
-				bridge.dispose();
+				removeSubscription(bridge.dispose(), bridge);
 				bridges.remove();
 				count++;
 			}
@@ -159,19 +204,12 @@ public class BridgeServer extends WebSocketServer {
 		System.out.println("... purge of " + count + " completed in " + (System.nanoTime() - t0) / 1000 / 1000 + "ms.");
 	}
 
-	public static BridgeServer startWithRetries(WebSocketServerFactory socketFactory, int port) throws UnknownHostException, InterruptedException {
-		while (true) {
-			try {
-				BridgeServer server = new BridgeServer(port);
-				server.setWebSocketFactory(socketFactory);
-				server.start();
-				server.waitForStart();
-				return server;
-			} catch (BindException e) {
-				System.out.println("Port already in use, trying again in three seconds.");
-				Thread.sleep(3000);
-			}
-		}
+	public static BridgeServer start(WebSocketServerFactory socketFactory, int port) throws UnknownHostException, InterruptedException, BindException {
+		BridgeServer server = new BridgeServer(port);
+		server.setWebSocketFactory(socketFactory);
+		server.start();
+		server.waitForStart();
+		return server;
 	}
 
 	public static void main(String[] argStrings)
@@ -195,7 +233,7 @@ public class BridgeServer extends WebSocketServer {
 			}
 		}
 		int port = args.get("-port", 8887);
-		BridgeServer s = startWithRetries(socketFactory, port);
+		BridgeServer s = start(socketFactory, port);
 		System.out.println(NAME + " started on port: " + s.getPort());
 
 		try {
@@ -204,7 +242,7 @@ public class BridgeServer extends WebSocketServer {
 				s.purgeInactiveConnections();
 			}
 		} finally {
-			s.stop(); // does not seem to work
+			s.stop();
 		}
 	}
 
