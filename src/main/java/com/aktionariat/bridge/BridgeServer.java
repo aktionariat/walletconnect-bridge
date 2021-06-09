@@ -36,8 +36,12 @@ import org.java_websocket.handshake.ClientHandshake;
 import org.java_websocket.server.DefaultSSLWebSocketServerFactory;
 import org.java_websocket.server.DefaultWebSocketServerFactory;
 import org.java_websocket.server.WebSocketServer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class BridgeServer extends WebSocketServer {
+	
+	private static final Logger LOG = LoggerFactory.getLogger(BridgeServer.class);
 
 	private static final String NAME = "WalletConnect Bridge Java Edition 0.1";
 
@@ -57,12 +61,12 @@ public class BridgeServer extends WebSocketServer {
 
 	@Override
 	public void onOpen(WebSocket conn, ClientHandshake handshake) {
-		System.out.println(conn.getRemoteSocketAddress().getAddress() + " opened a connection to us");
+		LOG.info(conn.getRemoteSocketAddress().getAddress() + " opened a connection to us");
 	}
 
 	@Override
 	public void onClose(WebSocket conn, int code, String reason, boolean remote) {
-		System.out.println(conn.getRemoteSocketAddress() + " closed the connection, status " + code);
+		LOG.info(conn.getRemoteSocketAddress() + " closed the connection, status " + code);
 	}
 
 	@Override
@@ -77,7 +81,7 @@ public class BridgeServer extends WebSocketServer {
 	@Override
 	public void onMessage(WebSocket conn, String message) {
 		try {
-			System.out.println("Received " + message + " from " + conn.getRemoteSocketAddress().getAddress());
+			LOG.info("Received " + message + " from " + conn.getRemoteSocketAddress().getAddress());
 			if (message.contentEquals("ping")) {
 				conn.send("pong"); // custom ping pong for monitoring, not related to ws protocol level ping
 			} else {
@@ -98,7 +102,7 @@ public class BridgeServer extends WebSocketServer {
 				}
 			}
 		} catch (IOException e) {
-			System.out.println("Error: " + e);
+			LOG.info("Error: " + e);
 			conn.close();
 		}
 	}
@@ -133,7 +137,7 @@ public class BridgeServer extends WebSocketServer {
 		HashSet<Bridge> subscriptions = this.subscriptions.get(conn);
 		if (subscriptions != null) {
 			for (Bridge bridge : subscriptions) {
-				System.out.println("Implicitely acking " + bridge + " from " + conn.getRemoteSocketAddress());
+				LOG.info("Implicitely acking " + bridge + " from " + conn.getRemoteSocketAddress());
 				bridge.ack();
 			}
 		}
@@ -189,8 +193,8 @@ public class BridgeServer extends WebSocketServer {
 
 	public synchronized void purgeInactiveConnections() {
 		long t0 = System.nanoTime();
-		System.out.println("Currently, there are " + this.subscriptions.size() + " subscriptions and " + this.bridges.size() + " bridges.");
-		System.out.println("Purging inactive connections...");
+		LOG.info("Currently, there are " + this.subscriptions.size() + " subscriptions and " + this.bridges.size() + " bridges.");
+		LOG.info("Purging inactive connections...");
 		int count = 0;
 		Iterator<Bridge> bridges = this.bridges.values().iterator();
 		while (bridges.hasNext()) {
@@ -201,7 +205,7 @@ public class BridgeServer extends WebSocketServer {
 				count++;
 			}
 		}
-		System.out.println("... purge of " + count + " completed in " + (System.nanoTime() - t0) / 1000 / 1000 + "ms.");
+		LOG.info("... purge of " + count + " completed in " + (System.nanoTime() - t0) / 1000 / 1000 + "ms.");
 	}
 
 	public static BridgeServer start(WebSocketServerFactory socketFactory, int port) throws UnknownHostException, InterruptedException, BindException {
@@ -234,7 +238,7 @@ public class BridgeServer extends WebSocketServer {
 		}
 		int port = args.get("-port", 8887);
 		BridgeServer s = start(socketFactory, port);
-		System.out.println(NAME + " started on port: " + s.getPort());
+		LOG.info(NAME + " started on port: " + s.getPort());
 
 		try {
 			while (true) {
