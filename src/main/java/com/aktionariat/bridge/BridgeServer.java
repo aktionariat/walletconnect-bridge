@@ -40,7 +40,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class BridgeServer extends WebSocketServer {
-	
+
 	private static final Logger LOG = LoggerFactory.getLogger(BridgeServer.class);
 
 	private static final String NAME = "WalletConnect Bridge Java Edition 0.1";
@@ -117,9 +117,11 @@ public class BridgeServer extends WebSocketServer {
 	private synchronized void removeSubscription(WebSocket replaced, Bridge bridge) {
 		if (replaced != null) {
 			HashSet<Bridge> bridges = this.subscriptions.get(replaced);
-			bridges.remove(bridge);
-			if (bridges.isEmpty()) {
-				this.subscriptions.remove(replaced);
+			if (bridges != null) {
+				bridges.remove(bridge);
+				if (bridges.isEmpty()) {
+					this.subscriptions.remove(replaced);
+				}
 			}
 		}
 	}
