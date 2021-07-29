@@ -22,8 +22,8 @@ import java.security.NoSuchAlgorithmException;
 import java.security.UnrecoverableKeyException;
 import java.security.cert.CertificateException;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Set;
 
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
@@ -43,10 +43,9 @@ public class BridgeServer extends WebSocketServer {
 
 	private static final Logger LOG = LoggerFactory.getLogger(BridgeServer.class);
 
-	private static final String NAME = "WalletConnect Bridge Java Edition 0.1";
+	private static final String NAME = "WalletConnect Bridge Java Edition 0.2";
 
 	private HashMap<String, Bridge> bridges;
-	private HashMap<WebSocket, HashSet<Bridge>> subscriptions;
 
 	private boolean startAttemptCompleted;
 	private BindException error;
@@ -56,7 +55,6 @@ public class BridgeServer extends WebSocketServer {
 		super.setReuseAddr(true);
 		this.startAttemptCompleted = false;
 		this.bridges = new HashMap<String, Bridge>();
-		this.subscriptions = new HashMap<WebSocket, HashSet<Bridge>>();
 	}
 
 	@Override
@@ -72,29 +70,31 @@ public class BridgeServer extends WebSocketServer {
 	@Override
 	public void onWebsocketPong(WebSocket conn, Framedata f) {
 		super.onWebsocketPong(conn, f);
-		Bridge bridge = (Bridge) conn.getAttachment();
-		if (bridge != null) {
-			bridge.ack();
+		@SuppressWarnings("unchecked")
+		Set<Bridge> bridges = (Set<Bridge>) conn.getAttachment();
+		if (bridges != null) {
+			for (Bridge bridge: bridges) {
+				bridge.ack();
+			}
 		}
 	}
 
 	@Override
 	public void onMessage(WebSocket conn, String message) {
 		try {
-			LOG.info("Received " + message + " from " + conn.getRemoteSocketAddress().getAddress());
+//			LOG.info("Received " + message + " from " + conn.getRemoteSocketAddress().getAddress());
 			if (message.contentEquals("ping")) {
 				conn.send("pong"); // custom ping pong for monitoring, not related to ws protocol level ping
 			} else {
-				implicitAck(conn);
-				WalletConnectMessage msg = WalletConnectMessage.parse(message);
+//				implicitAck(conn);
+				WalletConnectMessage msg = WalletConnectMessage.parse(conn, message);
 				Bridge bridge = obtainBridge(msg.topic);
 				switch (msg.type) {
 				case "pub":
-					bridge.push(message);
+					bridge.push(conn, msg);
 					break;
 				case "sub":
-					WebSocket replaced = bridge.sub(conn);
-					updateSubscription(replaced, conn, bridge);
+					bridge.sub(conn, msg);
 					break;
 				case "ack":
 					bridge.ack();
@@ -105,45 +105,6 @@ public class BridgeServer extends WebSocketServer {
 			LOG.info("Error: " + e);
 			conn.close();
 		}
-	}
-
-	private synchronized void updateSubscription(WebSocket replaced, WebSocket conn, Bridge bridge) {
-		if (replaced != conn) {
-			removeSubscription(replaced, bridge);
-			addSubscription(conn, bridge);
-		}
-	}
-
-	private synchronized void removeSubscription(WebSocket replaced, Bridge bridge) {
-		if (replaced != null) {
-			HashSet<Bridge> bridges = this.subscriptions.get(replaced);
-			if (bridges != null) {
-				bridges.remove(bridge);
-				if (bridges.isEmpty()) {
-					this.subscriptions.remove(replaced);
-				}
-			}
-		}
-	}
-
-	private synchronized void addSubscription(WebSocket conn, Bridge bridge) {
-		HashSet<Bridge> bridges = this.subscriptions.get(conn);
-		if (bridges == null) {
-			bridges = new HashSet<Bridge>();
-			this.subscriptions.put(conn, bridges);
-		}
-		bridges.add(bridge);
-	}
-
-	private synchronized void implicitAck(WebSocket conn) {
-		HashSet<Bridge> subscriptions = this.subscriptions.get(conn);
-		if (subscriptions != null) {
-			for (Bridge bridge : subscriptions) {
-				LOG.info("Implicitely acking " + bridge + " from " + conn.getRemoteSocketAddress());
-				bridge.ack();
-			}
-		}
-
 	}
 
 	private synchronized Bridge obtainBridge(String topic) {
@@ -195,14 +156,13 @@ public class BridgeServer extends WebSocketServer {
 
 	public synchronized void purgeInactiveConnections() {
 		long t0 = System.nanoTime();
-		LOG.info("Currently, there are " + this.subscriptions.size() + " subscriptions and " + this.bridges.size() + " bridges.");
+		LOG.info("Currently, there are " + this.bridges.size() + " bridges.");
 		LOG.info("Purging inactive connections...");
 		int count = 0;
 		Iterator<Bridge> bridges = this.bridges.values().iterator();
 		while (bridges.hasNext()) {
 			Bridge bridge = bridges.next();
 			if (bridge.isInactive()) {
-				removeSubscription(bridge.dispose(), bridge);
 				bridges.remove();
 				count++;
 			}

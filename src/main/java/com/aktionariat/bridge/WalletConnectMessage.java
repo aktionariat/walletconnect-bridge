@@ -10,7 +10,10 @@ package com.aktionariat.bridge;
 
 import java.io.IOException;
 
+import org.java_websocket.WebSocket;
+
 import com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.fasterxml.jackson.core.JacksonException;
@@ -29,9 +32,14 @@ public class WalletConnectMessage {
 	public String payload;
 	public String type;
 
-	public static WalletConnectMessage parse(String content) throws IOException {
+	@JsonIgnore
+	public WebSocket sender;
+
+	public static WalletConnectMessage parse(WebSocket sender, String content) throws IOException {
 		try {
-			return MAPPER.readValue(content, WalletConnectMessage.class);
+			WalletConnectMessage msg = MAPPER.readValue(content, WalletConnectMessage.class);
+			msg.sender = sender;
+			return msg;
 		} catch (JacksonException e) {
 			throw new IOException(e);
 		}
@@ -54,6 +62,15 @@ public class WalletConnectMessage {
 		mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, failOnUnknown);
 		mapper.setSerializationInclusion(Include.NON_NULL);
 		return mapper;
+	}
+
+	public boolean shouldDeliverTo(WebSocket subscriber) {
+		return !subscriber.equals(sender); // don't deliver messages back to the sender
+	}
+	
+	@Override
+	public String toString() {
+		return "Message of size " + payload.length() + " about " + topic.substring(0, 8) + "..."; 
 	}
 
 }
