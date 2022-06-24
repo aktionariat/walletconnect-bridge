@@ -59,7 +59,7 @@ public class BridgeServer extends WebSocketServer {
 
 	@Override
 	public void onOpen(WebSocket conn, ClientHandshake handshake) {
-		LOG.info(conn.getRemoteSocketAddress().getAddress() + " opened a connection to us");
+		LOG.info(conn.getRemoteSocketAddress() + " opened a connection to us");
 	}
 
 	@Override
@@ -82,7 +82,7 @@ public class BridgeServer extends WebSocketServer {
 	@Override
 	public void onMessage(WebSocket conn, String message) {
 		try {
-//			LOG.info("Received " + message + " from " + conn.getRemoteSocketAddress().getAddress());
+			LOG.info("Received " + message + " from " + conn.getRemoteSocketAddress());
 			if (message.contentEquals("ping")) {
 				conn.send("pong"); // custom ping pong for monitoring, not related to ws protocol level ping
 			} else {
